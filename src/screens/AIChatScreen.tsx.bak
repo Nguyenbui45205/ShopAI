@@ -1,0 +1,228 @@
+import React, { useState, useEffect, useLayoutEffect } from 'react';
+import {
+  SafeAreaView,
+  View,
+  Text,
+  TextInput,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
+import { useTheme } from '@contexts/ThemeContext';
+import { sendAiChatProxy } from '@services/api';
+
+type ChatMessage = {
+  id: string;
+  sender: 'user' | 'ai';
+  text: string;
+  isError?: boolean;
+};
+
+const SUGGESTIONS = [
+  'Tư vấn tai nghe chống ồn',
+  'Bàn phím cơ gõ code',
+  'Đồ gia dụng tiện ích',
+  'Chính sách phí giao hàng',
+];
+
+const CHAT_STORAGE_KEY = '@shopai_chat_history_v1';
+
+export default function AIChatScreen() {
+  const { colors } = useTheme();
+  const navigation = useNavigation();
+  const [input, setInput] = useState('');
+  const [typing, setTyping] = useState(false);
+  const [lastPrompt, setLastPrompt] = useState('');
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: 'welcome',
+      sender: 'ai',
+      text: 'Xin chào! 👋 Mình là Trợ lý tư vấn của ShopAI. Lịch sử trò chuyện của chúng ta được lưu giữ tự động nên bạn cứ thoải mái trao đổi nhé!',
+    },
+  ]);
+
+  const handleClearHistory = () => {
+    Alert.alert('Xóa lịch sử chat', 'Bạn có chắc chắn muốn xóa toàn bộ lịch sử trò chuyện không?', [
+      { text: 'Hủy', style: 'cancel' },
+      {
+        text: 'Xóa',
+        style: 'destructive',
+        onPress: () => {
+          const defaultMsg: ChatMessage[] = [
+            {
+              id: 'welcome',
+              sender: 'ai',
+              text: 'Đã làm mới lịch sử trò chuyện. Mình là Trợ lý tư vấn của ShopAI, bạn cần hỗ trợ gì nữa không?',
+            },
+          ];
+          saveMessagesToStorage(defaultMsg);
+        },
+      },
+    ]);
+  };
+
+  // Đưa nút Xóa lịch sử lên Header thanh tiêu đề phía trên bên phải
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable onPress={handleClearHistory} style={{ paddingHorizontal: 8, paddingVertical: 4 }}>
+          <Text style={{ color: colors.error, fontWeight: 'bold', fontSize: 13 }}>🗑️ Xóa</Text>
+        </Pressable>
+      ),
+    });
+  }, [navigation, colors]);
+
+  // Load lịch sử chat đã lưu khi mở màn hình
+  useEffect(() => {
+    AsyncStorage.getItem(CHAT_STORAGE_KEY).then(data => {
+      if (data) {
+        try {
+          const parsed = JSON.parse(data);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setMessages(parsed);
+          }
+        } catch (e) {
+          console.log('Lỗi đọc lịch sử chat', e);
+        }
+      }
+    });
+  }, []);
+
+  const saveMessagesToStorage = (newMsgs: ChatMessage[]) => {
+    setMessages(newMsgs);
+    AsyncStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(newMsgs)).catch(err =>
+      console.log('Lỗi lưu lịch sử chat', err)
+    );
+  };
+
+  const handleSend = async (promptText?: string, simulateFail = false) => {
+    const q = (promptText ?? input).trim();
+    if (!q) return;
+
+    setLastPrompt(q);
+    if (!promptText) setInput('');
+
+    const userMsg: ChatMessage = { id: `u-${Date.now()}`, sender: 'user', text: q };
+    const updatedWithUser = [...messages, userMsg];
+    saveMessagesToStorage(updatedWithUser);
+    setTyping(true);
+
+    try {
+      const reply = await sendAiChatProxy(q, simulateFail);
+      const aiMsg: ChatMessage = { id: `ai-${Date.now()}`, sender: 'ai', text: reply };
+      saveMessagesToStorage([...updatedWithUser, aiMsg]);
+    } catch (err: any) {
+      const errorMsg: ChatMessage = {
+        id: `err-${Date.now()}`,
+        sender: 'ai',
+        text: `⚠️ ${err.message}. Vui lòng bấm thử lại.`,
+        isError: true,
+      };
+      saveMessagesToStorage([...updatedWithUser, errorMsg]);
+    } finally {
+      setTyping(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={styles.suggestionRow}>
+        {SUGGESTIONS.map(s => (
+          <Pressable
+            key={s}
+            onPress={() => handleSend(s)}
+            style={[styles.chip, { backgroundColor: colors.surface, borderColor: colors.primary }]}
+          >
+            <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '600' }}>{s}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <FlatList
+        data={messages}
+        keyExtractor={item => item.id}
+        contentContainerStyle={{ padding: 14 }}
+        renderItem={({ item }) => {
+          const isUser = item.sender === 'user';
+          return (
+            <View
+              style={[
+                styles.bubble,
+                {
+                  alignSelf: isUser ? 'flex-end' : 'flex-start',
+                  backgroundColor: isUser ? colors.primary : item.isError ? '#FEE2E2' : colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Text
+                style={{
+                  color: isUser ? '#FFF' : item.isError ? colors.error : colors.text,
+                  fontSize: 13,
+                  lineHeight: 19,
+                }}
+              >
+                {item.text}
+              </Text>
+              {item.isError && (
+                <Pressable
+                  onPress={() => handleSend(lastPrompt || 'Tư vấn', false)}
+                  style={[styles.retryBtn, { backgroundColor: colors.error }]}
+                >
+                  <Text style={{ color: '#FFF', fontSize: 11, fontWeight: 'bold' }}>🔄 Thử lại</Text>
+                </Pressable>
+              )}
+            </View>
+          );
+        }}
+      />
+
+      {typing && (
+        <View style={styles.typingRow}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={{ color: colors.textLight, marginLeft: 8, fontSize: 12 }}>
+            Trợ lý ShopAI đang trả lời...
+          </Text>
+        </View>
+      )}
+
+      <View style={[styles.inputBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <TextInput
+          value={input}
+          onChangeText={setInput}
+          placeholder="Nhập câu hỏi cho trợ lý AI..."
+          placeholderTextColor={colors.textLight}
+          style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+        />
+        <Pressable
+          onPress={() => handleSend()}
+          style={[styles.sendBtn, { backgroundColor: colors.primary }]}
+        >
+          <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Gửi</Text>
+        </Pressable>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  suggestionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    gap: 6,
+  },
+  chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, borderWidth: 1 },
+  bubble: { maxWidth: '82%', padding: 12, borderRadius: 14, marginBottom: 10, borderWidth: 1 },
+  retryBtn: { marginTop: 8, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, alignSelf: 'flex-start' },
+  typingRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 8 },
+  inputBar: { flexDirection: 'row', padding: 10, borderTopWidth: 1, gap: 8 },
+  input: { flex: 1, height: 42, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, fontSize: 13 },
+  sendBtn: { paddingHorizontal: 18, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+});
