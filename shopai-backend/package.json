@@ -1,0 +1,11 @@
+{
+  "name": "shopai-backend",
+  "version": "1.0.0",
+  "description": "ShopAI NestJS-compatible Backend Server (Prisma JSON Persistence + JWT + AI Proxy)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "start:dev": "node server.js",
+    "test": "node test-backend.js"
+  }
+}

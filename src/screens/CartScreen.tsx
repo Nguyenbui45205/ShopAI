@@ -6,10 +6,7 @@ import {
   FlatList,
   Pressable,
   StyleSheet,
-  Alert,
-  Platform,
-  PermissionsAndroid,
-  Vibration,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -18,55 +15,20 @@ import { useTheme } from '@contexts/ThemeContext';
 import { useCartStore } from '@services/useCartStore';
 import { formatCurrency } from '@utils/formatCurrency';
 import ShopButton from '@components/ShopButton';
-
-const WAREHOUSE_COORDS = { lat: 10.8221, lon: 106.6868 };
-
-const calcDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-};
+import { useGpsStore } from '../store/useGpsStore'; // Import Store GPS dùng chung
 
 export default function CartScreen() {
   const { colors } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { items, distanceKm, setDistanceKm, updateQty, getTotalPrice } = useCartStore();
+  
+  // Chỉ lấy items và hàm xử lý giỏ hàng từ CartStore
+  const { items, updateQty, getTotalPrice } = useCartStore();
 
-  const handleLocateGPS = async () => {
-    try {
-      if (Platform.OS === 'android') {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
-        );
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          Alert.alert('Từ chối quyền', 'Cần cấp quyền GPS để cập nhật khoảng cách.');
-          return;
-        }
-      }
-      Vibration.vibrate(40);
-      const userCoords = { lat: 10.7769, lon: 106.7009 };
-      const dist = calcDistanceKm(
-        WAREHOUSE_COORDS.lat,
-        WAREHOUSE_COORDS.lon,
-        userCoords.lat,
-        userCoords.lon
-      );
-      setDistanceKm(Number(dist.toFixed(1)));
-    } catch {
-      Alert.alert('Lỗi định vị', 'Không thể lấy tọa độ GPS.');
-    }
-  };
+  // Lấy toàn bộ dữ liệu và hàm xử lý GPS từ GpsStore (Đồng bộ với Trang chủ)
+  const { distanceKm, shipFee, loading, fetchRealDeviceGps } = useGpsStore();
 
-  const shippingFee = Math.round(distanceKm * 5000);
   const subTotal = getTotalPrice();
-  const finalTotal = subTotal + shippingFee;
+  const finalTotal = subTotal + shipFee; // Tính tổng cộng với phí ship từ Store
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -122,13 +84,18 @@ export default function CartScreen() {
           { backgroundColor: colors.surface, borderColor: colors.border },
         ]}
       >
+        {/* Nút cập nhật GPS */}
         <Pressable
           style={[styles.gpsBtn, { borderColor: colors.primary }]}
-          onPress={handleLocateGPS}
+          onPress={fetchRealDeviceGps}
         >
-          <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 13 }}>
-            📍 Khoảng cách GPS: {distanceKm} km (Bấm để cập nhật lại)
-          </Text>
+          {loading ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 13 }}>
+              📍 Khoảng cách GPS: {distanceKm} km (Bấm để cập nhật lại)
+            </Text>
+          )}
         </Pressable>
 
         <View style={styles.summaryRow}>
@@ -140,7 +107,7 @@ export default function CartScreen() {
         <View style={styles.summaryRow}>
           <Text style={{ color: colors.textLight }}>Phí giao hàng (5.000đ/km):</Text>
           <Text style={{ color: colors.text, fontWeight: '600' }}>
-            {formatCurrency(shippingFee)}
+            {formatCurrency(shipFee)}
           </Text>
         </View>
         <View style={styles.summaryRow}>

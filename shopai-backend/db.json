@@ -1,0 +1,84 @@
+{
+  "users": [
+    {
+      "id": "u1",
+      "email": "demo@shopai.com",
+      "password": "password123",
+      "name": "Demo User"
+    }
+  ],
+  "products": [
+    {
+      "id": "1",
+      "name": "Tai nghe Bluetooth Chống Ồn Pro",
+      "price": 790000,
+      "category": "Điện tử",
+      "barcode": "8930001",
+      "image": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&q=80"
+    },
+    {
+      "id": "2",
+      "name": "Bàn phím Cơ Không Dây RGB",
+      "price": 1250000,
+      "category": "Điện tử",
+      "barcode": "8930002",
+      "image": "https://images.unsplash.com/photo-1511467687858-23d96c32e4ae?w=500&q=80"
+    },
+    {
+      "id": "3",
+      "name": "Áo Khoác Hoodie Uniqlo Form Rộng",
+      "price": 450000,
+      "category": "Thời trang",
+      "barcode": "8930003",
+      "image": "https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=500&q=80"
+    },
+    {
+      "id": "4",
+      "name": "Bình Giữ Nhiệt Inox 304 Cao Cấp",
+      "price": 290000,
+      "category": "Gia dụng",
+      "barcode": "8930004",
+      "image": "https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=500&q=80"
+    }
+  ],
+  "orders": [
+    {
+      "id": "ORD-1792639052064",
+      "customerName": "Bùi Công Nguyên",
+      "studentId": "23672641",
+      "address": "12 Nguyễn Văn Bảo, P.4, Quận Gò Vấp, TP.HCM",
+      "items": [
+        {
+          "product": {
+            "id": 1,
+            "name": "Tai nghe Bluetooth Chống Ồn AI",
+            "price": 890000,
+            "category": "electronics",
+            "categoryName": "Điện tử",
+            "barcode": "8930001",
+            "description": "Tai nghe không dây tích hợp khử tiếng ồn chủ động ANC, pin 30 giờ.",
+            "image": "https://picsum.photos/id/1/400/400"
+          },
+          "quantity": 3
+        },
+        {
+          "product": {
+            "id": 2,
+            "name": "Bàn phím Cơ Không Dây RGB",
+            "price": 1250000,
+            "category": "electronics",
+            "categoryName": "Điện tử",
+            "barcode": "8930002",
+            "description": "Switch Hotswap êm ái, LED RGB 16.8 triệu màu, kết nối 3 chế độ Bluetooth / 2.4GHz / Type-C.",
+            "image": "https://images.unsplash.com/photo-1511467687858-23d96c32e4ae?auto=format&fit=crop&w=600&q=80"
+          },
+          "quantity": 1
+        }
+      ],
+      "shippingFee": 26000,
+      "totalAmount": 3946000,
+      "status": "PENDING",
+      "createdAt": "2026-10-22T03:17:32.064Z"
+    }
+  ]
+}

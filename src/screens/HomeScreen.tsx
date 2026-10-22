@@ -44,9 +44,10 @@ export default function HomeScreen() {
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>('all');
 
   const timeLeft = useCountdown(3600);
+  
+  // Đã xóa distanceKm ở đây vì không còn dùng đến nữa
   const {
     user,
-    distanceKm,
     addToCart,
     scannedBarcode,
     setScannedBarcode,
@@ -162,12 +163,9 @@ export default function HomeScreen() {
                 <Text style={[styles.slogan, { color: colors.textLight }]}>
                   Xin chào, {user?.name || 'Khách'}
                 </Text>
-                <View style={styles.locationBadge}>
-                  <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '600' }}>
-                    📍 Kho Gò Vấp ({distanceKm} km) · Ước tính ship:{' '}
-                    {formatCurrency(distanceKm * 5000)}
-                  </Text>
-                </View>
+                
+                {/* Đã xóa đoạn text GPS cũ ở đây */}
+                
                 <View style={styles.flashRow}>
                   <Text style={[styles.flashLabel, { color: colors.secondary }]}>
                     ⚡ Flash Sale
@@ -226,7 +224,8 @@ export default function HomeScreen() {
             </View>
 
             <LocationBadge />
-        <View style={styles.searchRow}>
+            
+            <View style={styles.searchRow}>
               <TextInput
                 value={search}
                 onChangeText={setSearch}
@@ -367,7 +366,7 @@ const styles = StyleSheet.create({
   },
   logo: { fontSize: 22, fontWeight: 'bold' },
   slogan: { fontSize: 12, marginTop: 2 },
-  locationBadge: { marginTop: 4 },
+  locationBadge: { marginTop: 4 }, // Giữ nguyên class này phòng trường hợp bạn cần sau này
   flashRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
   flashLabel: { fontWeight: 'bold', fontSize: 12 },
   timer: { marginLeft: 6, fontWeight: 'bold', fontSize: 12 },

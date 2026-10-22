@@ -1,0 +1,6 @@
+appId: com.shopai
+---
+- launchApp
+- tapOn: "+ Thêm vào giỏ"
+- tapOn: "Giỏ hàng"
+- assertVisible: "Thanh toán"

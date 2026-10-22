@@ -1,0 +1,6 @@
+appId: com.shopai
+---
+- launchApp
+- assertVisible: "ShopAI"
+- assertVisible: "Quét mã"
+- assertVisible: "Chat"

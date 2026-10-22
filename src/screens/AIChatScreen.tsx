@@ -14,13 +14,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '@contexts/ThemeContext';
-
-interface ChatMessage {
-  id: string;
-  sender: 'user' | 'ai';
-  text: string;
-  isError?: boolean;
-}
+import { useChatStore } from '../store/useChatStore';
 
 const QUICK_PROMPTS = [
   'Tư vấn tai nghe dưới 1 triệu',
@@ -32,16 +26,13 @@ const QUICK_PROMPTS = [
 export default function AIChatScreen() {
   const { colors } = useTheme();
   const navigation = useNavigation<any>();
+  
+  // Gọi kho lưu trữ vĩnh viễn (thay thế cho useState cục bộ)
+  const { messages, addMessage, clearHistory } = useChatStore();
+  
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [lastFailedPrompt, setLastFailedPrompt] = useState<string | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'welcome-1',
-      sender: 'ai',
-      text: 'Xin chào! Tôi là trợ lý AI của ShopAI. Tôi có thể giúp gì cho bạn hôm nay?',
-    },
-  ]);
 
   const sendMessage = async (customPrompt?: string) => {
     const textToSend = (customPrompt ?? input).trim();
@@ -50,26 +41,26 @@ export default function AIChatScreen() {
     if (!customPrompt) setInput('');
     setLastFailedPrompt(null);
 
-    const userMsg: ChatMessage = {
+    // Lưu tin nhắn của user vào Store
+    addMessage({
       id: 'user-' + Date.now(),
-      sender: 'user',
       text: textToSend,
-    };
-
-    setMessages(prev => [...prev, userMsg]);
+      isBot: false,
+      timestamp: Date.now(),
+    });
+    
     setIsTyping(true);
 
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 5000);
 
-      // Thử gọi qua NestJS Proxy
       const res = await fetch('http://10.0.2.2:3000/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: textToSend,
-          history: messages.map(m => ({ role: m.sender, content: m.text })),
+          history: messages.map(m => ({ role: m.isBot ? 'ai' : 'user', content: m.text })),
         }),
         signal: controller.signal,
       });
@@ -79,16 +70,14 @@ export default function AIChatScreen() {
       if (!res.ok) throw new Error('Proxy error');
       const data = await res.json();
 
-      setMessages(prev => [
-        ...prev,
-        {
-          id: 'ai-' + Date.now(),
-          sender: 'ai',
-          text: data.reply || data.message || 'ShopAI đã ghi nhận yêu cầu của bạn!',
-        },
-      ]);
+      // Lưu tin nhắn phản hồi của AI vào Store
+      addMessage({
+        id: 'ai-' + Date.now(),
+        text: data.reply || data.message || 'ShopAI đã ghi nhận yêu cầu của bạn!',
+        isBot: true,
+        timestamp: Date.now(),
+      });
     } catch (err) {
-      // Phản hồi thông minh khi chạy độc lập không cần backend chết cứng
       setLastFailedPrompt(textToSend);
       let smartReply = 'ShopAI gợi ý bạn tham khảo các sản phẩm đang có chương trình Flash Sale trên Trang chủ.';
       const lower = textToSend.toLowerCase();
@@ -100,14 +89,14 @@ export default function AIChatScreen() {
         smartReply = 'ShopAI có các dòng tai nghe Bluetooth chống ồn giá tốt từ 500.000đ đến 1.500.000đ đang giảm giá mạnh!';
       }
 
-      setMessages(prev => [
-        ...prev,
-        {
-          id: 'ai-' + Date.now(),
-          sender: 'ai',
-          text: `${smartReply} (Đã phản hồi ở chế độ Trợ lý thông minh).`,
-        },
-      ]);
+      // Lưu tin nhắn Fallback vào Store
+      addMessage({
+        id: 'ai-' + Date.now(),
+        text: `${smartReply} (Đã phản hồi ở chế độ Trợ lý thông minh).`,
+        isBot: true,
+        timestamp: Date.now(),
+        isError: true, // Ép kiểu linh hoạt cho UI hiển thị lỗi
+      } as any);
     } finally {
       setIsTyping(false);
     }
@@ -124,13 +113,7 @@ export default function AIChatScreen() {
           style: 'destructive',
           onPress: () => {
             setLastFailedPrompt(null);
-            setMessages([
-              {
-                id: 'welcome-' + Date.now(),
-                sender: 'ai',
-                text: 'Đã làm mới cuộc trò chuyện. Bạn cần hỗ trợ gì tiếp theo?',
-              },
-            ]);
+            clearHistory(); // Gọi hàm xóa từ Store
           },
         },
       ]
@@ -139,7 +122,6 @@ export default function AIChatScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header chuẩn duy nhất không bị lặp */}
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 14 }}>← Quay lại</Text>
@@ -150,7 +132,6 @@ export default function AIChatScreen() {
         </Pressable>
       </View>
 
-      {/* Thanh gợi ý nhanh */}
       <View style={styles.promptSection}>
         <FlatList
           horizontal
@@ -169,13 +150,14 @@ export default function AIChatScreen() {
         />
       </View>
 
-      {/* Danh sách tin nhắn */}
       <FlatList
         data={messages}
         keyExtractor={item => item.id}
         contentContainerStyle={{ padding: 16, gap: 10 }}
         renderItem={({ item }) => {
-          const isUser = item.sender === 'user';
+          const isUser = !item.isBot; // Sử dụng cờ isBot từ Store thay vì sender
+          const isError = (item as any).isError;
+
           return (
             <View
               style={[
@@ -184,16 +166,16 @@ export default function AIChatScreen() {
                   ? { alignSelf: 'flex-end', backgroundColor: colors.primary }
                   : {
                       alignSelf: 'flex-start',
-                      backgroundColor: item.isError ? '#FEF2F2' : colors.surface,
-                      borderColor: item.isError ? '#F87171' : colors.border,
+                      backgroundColor: isError ? '#FEF2F2' : colors.surface,
+                      borderColor: isError ? '#F87171' : colors.border,
                       borderWidth: 1,
                     },
               ]}
             >
-              <Text style={{ color: isUser ? '#FFF' : item.isError ? '#991B1B' : colors.text, fontSize: 14 }}>
+              <Text style={{ color: isUser ? '#FFF' : isError ? '#991B1B' : colors.text, fontSize: 14 }}>
                 {item.text}
               </Text>
-              {item.isError && lastFailedPrompt && (
+              {isError && lastFailedPrompt && (
                 <Pressable onPress={() => sendMessage(lastFailedPrompt)} style={styles.retryBtn}>
                   <Text style={styles.retryBtnText}>🔄 Thử lại</Text>
                 </Pressable>
@@ -210,7 +192,6 @@ export default function AIChatScreen() {
         </View>
       )}
 
-      {/* Ô nhập tin nhắn */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={[styles.inputBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}
